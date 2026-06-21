@@ -1,0 +1,1090 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hydrogrow - Interactive Hydroponics Game</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <style>
+    body {
+      font-family: 'Quicksand', sans-serif;
+      background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%);
+      user-select: none;
+    }
+    .title-font {
+      font-family: 'Fredoka', sans-serif;
+    }
+    /* Aspect ratio preservation for desktop/tablet dashboard scaling */
+    .game-container {
+      aspect-ratio: 16 / 9;
+      max-height: 92vh;
+    }
+    
+    /* Interactive SVG animations */
+    @keyframes bubbleUp {
+      0% { transform: translateY(12px) scale(0.7); opacity: 0; }
+      50% { opacity: 0.8; }
+      100% { transform: translateY(-70px) scale(1.3); opacity: 0; }
+    }
+    .bubble {
+      animation: bubbleUp 2.8s infinite ease-in-out;
+    }
+    .bubble-1 { animation-delay: 0.1s; }
+    .bubble-2 { animation-delay: 0.8s; }
+    .bubble-3 { animation-delay: 1.5s; }
+    .bubble-4 { animation-delay: 2.2s; }
+
+    @keyframes plantSway {
+      0%, 100% { transform: rotate(0deg); }
+      50% { transform: rotate(2deg); }
+    }
+    .sway {
+      transform-origin: bottom center;
+      animation: plantSway 4.5s infinite ease-in-out;
+    }
+
+    @keyframes pestWiggle {
+      0%, 100% { transform: translate(0, 0) rotate(-6deg); }
+      50% { transform: translate(1px, -2px) rotate(6deg); }
+    }
+    .pest {
+      animation: pestWiggle 1s infinite ease-in-out;
+      transform-origin: center;
+    }
+
+    .pulse-btn:hover {
+      transform: scale(1.025);
+      transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-3">
+
+  <!-- Ambient Decorative Background Blobs -->
+  <div class="absolute inset-0 overflow-hidden pointer-events-none">
+    <div class="absolute -top-32 -left-32 w-80 h-80 bg-emerald-200/40 rounded-full filter blur-3xl opacity-50 animate-pulse"></div>
+    <div class="absolute -bottom-32 -right-32 w-80 h-80 bg-sky-200/40 rounded-full filter blur-3xl opacity-50 animate-pulse" style="animation-delay: 2.5s;"></div>
+  </div>
+
+  <!-- MAIN 16:9 GAME CONTAINER -->
+  <div class="relative w-full max-w-6xl bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 border-emerald-600/30 overflow-hidden game-container flex flex-col justify-between">
+    
+    <header class="bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white px-5 py-2.5 flex items-center justify-between shadow-md z-10">
+      <div class="flex items-center gap-3">
+        <div class="bg-white p-1 rounded-xl shadow-inner">
+          <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707m0-12.728l.707.707m12.728 12.728l.707.707M12 8a4 4 0 100 8 4 4 0 000-8z" />
+          </svg>
+        </div>
+        <div>
+          <h1 class="title-font text-xl md:text-2xl font-black tracking-wide leading-none">HYDROGROW</h1>
+          <p class="text-[10px] text-emerald-100 font-semibold tracking-wider uppercase">Grade 8 Interactive Agriculture</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 text-xs font-bold">
+        <!-- Live Difficulty Level -->
+        <div class="bg-emerald-700/60 px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-emerald-500/30">
+          <span class="text-[9px] text-emerald-300">DIFFICULTY:</span>
+          <span id="level-display" class="text-yellow-300 tracking-wider">EASY</span>
+        </div>
+        <!-- Progress Bar Indicator -->
+        <div class="flex items-center gap-1" id="progress-dots-container">
+          <!-- Populated by JS as 15 tracking nodes -->
+        </div>
+        <!-- Point Counter -->
+        <div class="bg-emerald-800/80 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 border border-emerald-400/30 shadow-inner">
+          <span class="text-yellow-300 text-sm">🏆</span>
+          <span id="score-display" class="text-white text-base font-black">0</span>
+        </div>
+        <!-- Sound System Control -->
+        <button id="music-toggle" class="bg-emerald-500 hover:bg-emerald-400 p-2 rounded-xl transition-all shadow-md" title="Toggle Sound">
+          <svg id="music-on-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072M18.364 5.636a9 9 0 010 12.728M12 18.75V5.25L7.75 9.5H4.5v5h3.25L12 18.75z" />
+          </svg>
+          <svg id="music-off-icon" class="w-4 h-4 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- WORKSPACE SCREENS -->
+    <main class="flex-1 relative overflow-hidden flex bg-slate-50/20">
+      
+      <!-- WELCOME / AVATAR SCREEN -->
+      <section id="welcome-screen" class="absolute inset-0 bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-100 flex flex-col items-center justify-center p-6 text-center z-30 transition-all duration-500">
+        <div class="max-w-2xl bg-white/90 border border-emerald-500/20 rounded-2xl p-6 shadow-xl flex flex-col items-center gap-4">
+          <!-- Logo Block -->
+          <div class="relative w-20 h-20 bg-gradient-to-tr from-emerald-500 to-teal-400 rounded-2xl flex items-center justify-center shadow-lg animate-bounce duration-1000">
+            <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            </svg>
+          </div>
+
+          <div>
+            <h2 class="title-font text-3xl md:text-4xl font-extrabold text-emerald-800 tracking-wide leading-none">Hydrogrow Agricultural Challenge</h2>
+            <p class="text-xs md:text-sm text-gray-600 mt-2 max-w-xl mx-auto leading-relaxed">
+              Based on the curriculum module <strong class="text-teal-600">"Hydroponics 101 (4)_2.pptx"</strong>. 
+              Test your knowledge across 15 interactive questions. Correct answers grow your plant's roots, develop stems/leaves, bloom crop yields, and drive away harmful pests!
+            </p>
+          </div>
+
+          <!-- Avatar Pick Grid -->
+          <div class="w-full">
+            <p class="text-xs font-bold text-teal-800 mb-2 uppercase tracking-wider">Choose your crop avatar:</p>
+            <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto">
+              <button onclick="selectCrop('tomato')" class="avatar-select-btn border-2 border-emerald-500 bg-emerald-50 rounded-xl p-2.5 flex flex-col items-center gap-1 hover:bg-emerald-100 transition-all shadow-sm group">
+                <span class="text-2xl group-hover:scale-110 transition-transform">🍅</span>
+                <span class="text-xs font-bold text-emerald-800">Tomato</span>
+              </button>
+              <button onclick="selectCrop('lettuce')" class="avatar-select-btn border border-gray-200 bg-white rounded-xl p-2.5 flex flex-col items-center gap-1 hover:bg-emerald-50 transition-all shadow-sm group">
+                <span class="text-2xl group-hover:scale-110 transition-transform">🥬</span>
+                <span class="text-xs font-bold text-gray-700">Lettuce</span>
+              </button>
+              <button onclick="selectCrop('pechay')" class="avatar-select-btn border border-gray-200 bg-white rounded-xl p-2.5 flex flex-col items-center gap-1 hover:bg-emerald-50 transition-all shadow-sm group">
+                <span class="text-2xl group-hover:scale-110 transition-transform">🌱</span>
+                <span class="text-xs font-bold text-gray-700">Pechay</span>
+              </button>
+            </div>
+          </div>
+
+          <button onclick="startGame()" class="pulse-btn mt-1 px-8 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-white font-extrabold text-sm md:text-base rounded-full shadow-lg border-b-4 border-orange-700 tracking-wider transition-all">
+            START WATER GROWING!
+          </button>
+        </div>
+      </section>
+
+      <!-- MAIN GAME PLAY FIELD -->
+      <section id="game-screen" class="hidden absolute inset-0 flex flex-row p-3 gap-3 w-full h-full">
+        
+        <!-- LEFT PANEL: HYDRO RESERVOIR VISUALS -->
+        <div class="w-5/12 bg-sky-50/40 rounded-2xl border border-emerald-500/10 p-3 flex flex-col justify-between items-center relative overflow-hidden shadow-inner">
+          
+          <!-- Background Window grid details -->
+          <div class="absolute inset-0 grid grid-cols-3 grid-rows-3 opacity-5 pointer-events-none">
+            <div class="border-r border-b border-sky-900"></div>
+            <div class="border-r border-b border-sky-900"></div>
+            <div class="border-b border-sky-900"></div>
+            <div class="border-r border-b border-sky-900"></div>
+            <div class="border-r border-b border-sky-900"></div>
+            <div class="border-b border-sky-900"></div>
+          </div>
+
+          <!-- Dynamic Sunlight Status bar -->
+          <div class="w-full flex items-center justify-between px-3 py-1.5 bg-white/80 backdrop-blur-sm rounded-lg shadow-sm z-10 text-[10px]">
+            <span class="flex items-center gap-1 font-bold text-amber-600">
+              <span class="animate-spin" style="animation-duration: 12s;">☀️</span> LIGHT: 6H+ OPTIMAL
+            </span>
+            <span id="hud-status" class="font-bold text-emerald-600 animate-pulse uppercase">SEEDLING ENVIRONMENT</span>
+          </div>
+
+          <!-- GROWING PLANT SVG COMPONENT -->
+          <div class="w-full flex-1 flex items-center justify-center relative">
+            <svg id="garden-svg" class="w-11/12 h-5/6" viewBox="0 0 200 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="waterGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#0284c7" stop-opacity="0.95"/>
+                </linearGradient>
+                <linearGradient id="potGrad" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#78716c"/>
+                  <stop offset="50%" stop-color="#a8a29e"/>
+                  <stop offset="100%" stop-color="#57534e"/>
+                </linearGradient>
+                <linearGradient id="tankGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#e2e8f0" stop-opacity="0.6"/>
+                  <stop offset="100%" stop-color="#94a3b8" stop-opacity="0.85"/>
+                </linearGradient>
+              </defs>
+
+              <!-- SOILLESS TANK RESERVOIR (Hydroponic base) -->
+              <rect x="25" y="140" width="150" height="90" rx="10" fill="url(#tankGrad)" stroke="#475569" stroke-width="2.5" />
+              <!-- Nutrient Water Solution level -->
+              <rect id="water-solution" x="28" y="152" width="144" height="75" rx="6" fill="url(#waterGrad)" />
+              <!-- Active Oxygen/Water Bubbles (Synthesized via CSS animations) -->
+              <circle class="bubble bubble-1" cx="55" cy="220" r="3" fill="white" opacity="0.75"/>
+              <circle class="bubble bubble-2" cx="100" cy="220" r="2" fill="white" opacity="0.6"/>
+              <circle class="bubble bubble-3" cx="145" cy="220" r="3.5" fill="white" opacity="0.8"/>
+              <circle class="bubble bubble-4" cx="80" cy="215" r="2.5" fill="white" opacity="0.5"/>
+
+              <!-- Tank Label descriptor -->
+              <text x="100" y="215" fill="#f0f9ff" font-size="6.5" font-weight="bold" text-anchor="middle" letter-spacing="0.5" opacity="0.75">NUTRIENT RESERVOIR</text>
+
+              <!-- Net Cup Basket details -->
+              <rect x="20" y="135" width="160" height="8" rx="3.5" fill="#334155" />
+              <!-- Pot Container mesh -->
+              <path d="M85 138 L90 162 L110 162 L115 138 Z" fill="url(#potGrad)" stroke="#1c1917" stroke-width="1.2" />
+              <line x1="91" y1="145" x2="109" y2="145" stroke="#1c1917" stroke-dasharray="1.5 1.5" />
+              <line x1="93" y1="153" x2="107" y2="153" stroke="#1c1917" stroke-dasharray="1.5 1.5" />
+
+              <!-- THE ROOT NETWORK: Grows dynamically based on Level 1 (Easy) answers -->
+              <!-- Root sprout tier 1 -->
+              <g id="root-tier-1" class="hidden transition-opacity duration-300">
+                <path d="M100 162 C98 172, 95 178, 91 184" stroke="#fef08a" stroke-width="1.8" stroke-linecap="round"/>
+                <path d="M100 162 C102 172, 105 178, 109 184" stroke="#fef08a" stroke-width="1.8" stroke-linecap="round"/>
+              </g>
+              <!-- Root sprout tier 2 -->
+              <g id="root-tier-2" class="hidden transition-opacity duration-300">
+                <path d="M91 184 C86 194, 78 198, 72 204" stroke="#fef08a" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M109 184 C114 194, 122 198, 128 204" stroke="#fef08a" stroke-width="1.5" stroke-linecap="round"/>
+                <path d="M100 162 L100 192" stroke="#eab308" stroke-width="2" stroke-linecap="round"/>
+              </g>
+              <!-- Root sprout tier 3 -->
+              <g id="root-tier-3" class="hidden transition-opacity duration-300">
+                <path d="M72 204 C65 210, 60 212, 54 214" stroke="#fef08a" stroke-width="1" stroke-linecap="round"/>
+                <path d="M128 204 C135 210, 140 212, 146 214" stroke="#fef08a" stroke-width="1" stroke-linecap="round"/>
+                <path d="M100 192 C97 202, 94 208, 88 214" stroke="#fef08a" stroke-width="1.2" stroke-linecap="round"/>
+                <path d="M100 192 C103 202, 106 208, 112 214" stroke="#fef08a" stroke-width="1.2" stroke-linecap="round"/>
+              </g>
+
+              <!-- PLANT STEM & LEAVES: Grows dynamically based on Level 2 (Medium) answers -->
+              <g id="plant-stem" class="hidden sway">
+                <path d="M100 138 C100 110, 102 92, 100 70" stroke="#22c55e" stroke-width="4" stroke-linecap="round" />
+                <!-- True Leaf Sprouts -->
+                <path id="leaf-1" class="hidden" d="M100 118 C85 113, 70 102, 65 107 C60 112, 80 122, 100 118" fill="#15803d" stroke="#14532d" stroke-width="0.8" />
+                <path id="leaf-2" class="hidden" d="M100 103 C115 98, 130 87, 135 92 C140 97, 120 107, 100 103" fill="#15803d" stroke="#14532d" stroke-width="0.8" />
+                <path id="leaf-3" class="hidden" d="M100 88 C82 82, 72 68, 77 63 C82 58, 96 73, 100 88" fill="#22c55e" stroke="#166534" stroke-width="0.8" />
+                <path id="leaf-4" class="hidden" d="M100 77 C118 71, 128 57, 123 52 C118 47, 104 62, 100 77" fill="#22c55e" stroke="#166534" stroke-width="0.8" />
+              </g>
+
+              <!-- PLANT FLOWERS & VEGETABLES: Sprout dynamically based on Level 3 (Hard) answers -->
+              <!-- Yellow flowers -->
+              <g id="flowers" class="hidden sway">
+                <circle cx="85" cy="80" r="4.5" fill="#facc15" stroke="#ca8a04" />
+                <circle cx="115" cy="65" r="4.5" fill="#facc15" stroke="#ca8a04" />
+              </g>
+              <!-- Ripe Cherry Tomatoes / Lettuce crowns depending on avatar -->
+              <g id="fruits" class="hidden sway">
+                <!-- Fallback/Default tomato SVG graphics - updated dynamically on crop choice -->
+                <g id="crop-shapes-g">
+                  <circle cx="80" cy="95" r="7.5" fill="#ef4444" stroke="#b91c1c" />
+                  <circle cx="120" cy="80" r="8.5" fill="#ef4444" stroke="#b91c1c" />
+                  <circle cx="77" cy="92" r="1.5" fill="white" opacity="0.6"/>
+                  <circle cx="117" cy="77" r="1.5" fill="white" opacity="0.6"/>
+                </g>
+              </g>
+
+              <!-- HARMFUL INSECTS / PESTS: Appear on incorrect answers, leave on correct ones -->
+              <g id="pests-group" class="hidden">
+                <!-- Red bug crawls -->
+                <g class="pest" transform="translate(62, 92)">
+                  <ellipse cx="0" cy="0" rx="3.5" ry="5.5" fill="#991b1b" />
+                  <circle cx="0" cy="-5" r="2" fill="#450a0a" />
+                  <path d="M-4 -2 L-7 -4 M-4 0 L-7 0 M-4 2 L-7 4 M4 -2 L7 -4 M4 0 L7 0 M4 2 L7 4" stroke="#450a0a" stroke-width="0.8" />
+                </g>
+                <g class="pest" transform="translate(136, 102)">
+                  <ellipse cx="0" cy="0" rx="3.5" ry="5.5" fill="#991b1b" />
+                  <circle cx="0" cy="-5" r="2" fill="#450a0a" />
+                  <path d="M-4 -2 L-7 -4 M-4 0 L-7 0 M-4 2 L-7 4 M4 -2 L7 -4 M4 0 L7 0 M4 2 L7 4" stroke="#450a0a" stroke-width="0.8" />
+                </g>
+              </g>
+            </svg>
+          </div>
+
+          <div class="w-full grid grid-cols-2 gap-2 bg-slate-900 text-white rounded-xl p-2.5 text-[10px] font-mono shadow-md">
+            <div class="flex flex-col border-r border-slate-700/50 pr-1">
+              <span class="text-slate-400 font-bold uppercase">EC MONITOR:</span>
+              <span id="ec-value" class="text-emerald-400 font-bold text-xs animate-pulse">0.0 mS/cm</span>
+              <span class="text-[8px] text-slate-500">TDS sediment mix</span>
+            </div>
+            <div class="flex flex-col pl-1">
+              <span class="text-slate-400 font-bold uppercase">PH LEVEL:</span>
+              <span id="ph-value" class="text-sky-400 font-bold text-xs animate-pulse">0.0 Neutral</span>
+              <span class="text-[8px] text-slate-500">Water acidity state</span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- RIGHT PANEL: GAME ENGINE / SYSTEM QUIZ -->
+        <div class="w-7/12 flex flex-col justify-between p-1 bg-white">
+          
+          <!-- Difficulty Level Banner -->
+          <div class="bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-500/10 p-3 rounded-xl flex items-center justify-between shadow-sm">
+            <div>
+              <span id="q-level-badge" class="px-2.5 py-1 text-[10px] font-bold rounded-md bg-emerald-100 text-emerald-800 uppercase">Level 1: Easy</span>
+              <span class="text-xs text-gray-500 ml-2 font-semibold" id="q-number-display">Question 1 of 15</span>
+            </div>
+            <span class="text-xs font-bold text-teal-800" id="q-points-indicator">+100 PTS</span>
+          </div>
+
+          <!-- Question Box -->
+          <div class="my-4 px-2 flex-1 flex flex-col justify-center">
+            <h3 id="question-text" class="text-base md:text-lg font-bold text-gray-800 leading-snug">
+              Configuring your agricultural quiz modules...
+            </h3>
+          </div>
+
+          <!-- Multiple Choices Option grid (4 Buttons) -->
+          <div class="grid grid-cols-1 gap-2.5 mb-2" id="options-container">
+            <!-- Programmatically Shuffled on load/restart -->
+          </div>
+
+          <!-- Footer source credentials -->
+          <div class="text-[9px] text-gray-400 text-center py-1 border-t border-gray-100">
+            Source references: <span class="font-semibold italic">Hydroponics 101 (4)_2.pptx</span>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- FEEDBACK OVERLAY MODAL -->
+      <div id="feedback-modal" class="hidden absolute inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-40 p-4 transition-all duration-300">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl border-4 border-emerald-500 transform scale-95 transition-transform duration-300 flex flex-col items-center text-center gap-3">
+          
+          <div id="feedback-icon-container" class="w-14 h-14 rounded-full flex items-center justify-center text-white text-3xl shadow-md">
+            ✅
+          </div>
+
+          <h4 id="feedback-title" class="title-font text-xl md:text-2xl font-bold text-emerald-800">Correct Answer!</h4>
+
+          <p id="feedback-explanation" class="text-xs md:text-sm text-gray-600 leading-relaxed bg-emerald-50 p-3.5 rounded-xl border border-emerald-100">
+            Explanation load.
+          </p>
+
+          <div class="flex items-center gap-2.5 text-xs font-bold text-teal-800">
+            <span class="bg-teal-100 px-3 py-1.5 rounded-lg" id="feedback-points">+100 Points</span>
+            <span class="bg-emerald-100 px-3 py-1.5 rounded-lg" id="feedback-action">🌱 Extended Roots</span>
+          </div>
+
+          <button onclick="nextQuestion()" class="pulse-btn px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider rounded-full shadow border-b-4 border-emerald-800 transition-all">
+            CONTINUE GROWING
+          </button>
+        </div>
+      </div>
+
+      <!-- GAME OVER SUMMARY SCREEN -->
+      <section id="gameover-screen" class="hidden absolute inset-0 bg-gradient-to-br from-indigo-50 via-teal-50 to-emerald-100 flex flex-col items-center justify-center p-6 text-center z-30 transition-all duration-500">
+        <div class="max-w-xl bg-white/95 border-4 border-amber-400 rounded-3xl p-5 shadow-2xl flex flex-col items-center gap-4">
+          
+          <div class="text-4xl">🏆🏆🏆</div>
+          
+          <div>
+            <h2 class="title-font text-2xl md:text-3xl font-black text-emerald-800 tracking-wide uppercase leading-none">Harvest Completed!</h2>
+            <p class="text-[10px] text-gray-500 mt-1.5 font-bold">You successfully completed the 15-question Hydrogrow Challenge!</p>
+          </div>
+
+          <!-- Stats summary -->
+          <div class="w-full grid grid-cols-3 gap-2.5 bg-gradient-to-tr from-emerald-50 to-teal-50/50 p-3.5 rounded-xl border border-emerald-500/10">
+            <div class="flex flex-col items-center">
+              <span class="text-gray-500 text-[10px] font-semibold">FINAL SCORE</span>
+              <span id="final-score" class="text-xl font-black text-emerald-700">3000</span>
+              <span class="text-[8px] text-gray-400">Total Points</span>
+            </div>
+            <div class="flex flex-col items-center border-x border-emerald-500/15">
+              <span class="text-gray-500 text-[10px] font-semibold">ACCURACY</span>
+              <span id="final-accuracy" class="text-xl font-black text-teal-700">93%</span>
+              <span class="text-[8px] text-gray-400" id="final-correct-fraction">14 / 15</span>
+            </div>
+            <div class="flex flex-col items-center">
+              <span class="text-gray-500 text-[10px] font-semibold">FARMER RANK</span>
+              <span id="final-rank" class="text-xs font-black text-orange-600 uppercase mt-1">MASTER GROWER</span>
+              <span class="text-[8px] text-gray-400" id="final-rank-desc">Superb Care!</span>
+            </div>
+          </div>
+
+          <div class="text-left w-full max-w-sm bg-white p-3 rounded-lg border border-gray-100 text-[10px] space-y-1">
+            <p class="font-bold text-gray-700 text-center border-b pb-1 mb-1 uppercase tracking-wider text-[9px]">Topic Knowledge Mastered:</p>
+            <div class="flex gap-2 text-gray-600"><span class="text-emerald-500">✔</span> <span>Soilless culture history, pH key, and micronutrients.</span></div>
+            <div class="flex gap-2 text-gray-600"><span class="text-emerald-500">✔</span> <span>Kratky, DWC, NFT, and Aeroponic system dynamics.</span></div>
+            <div class="flex gap-2 text-gray-600"><span class="text-emerald-500">✔</span> <span>Pechay and Lettuce health benefits (Folate/DNA repair).</span></div>
+          </div>
+
+          <div class="flex gap-3">
+            <!-- Shuffles choices on restart automatically -->
+            <button onclick="restartGame()" class="pulse-btn px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs tracking-wider rounded-full shadow border-b-4 border-emerald-800 transition-all">
+              PLAY AGAIN 🔄
+            </button>
+            <button onclick="showWelcomeScreen()" class="pulse-btn px-6 py-2.5 bg-gradient-to-r from-gray-600 to-slate-700 hover:from-gray-500 hover:to-slate-600 text-white font-extrabold text-xs tracking-wider rounded-full shadow border-b-4 border-gray-800 transition-all">
+              AVATAR MENU
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- JAVASCRIPT GAMEPLAY ENGINE & QUESTIONS DATABASE -->
+  <script>
+    // Exact 15 questions formulated matching the exact prompt guidelines and sequence
+    const sourceQuestions = [
+      // Easy (Questions 1-5)
+      {
+        text: "What does hydroponics mean?",
+        level: "Easy",
+        levelIdx: 1,
+        points: 100,
+        options: [
+          "A method of growing plants using mineral nutrient solutions in water, without soil.",
+          "An organic field irrigation system optimized strictly for high altitude mountains.",
+          "A modern forest conservation system utilizing clean ground clay and fertilizers.",
+          "A traditional farming method that purifies contaminated soils with solar water pumps."
+        ],
+        correctAnswer: 0,
+        explanation: "As outlined in Hydroponics 101 (4)_2.pptx, hydroponics is a soil-free cultivation method delivering mineral nutrient solutions directly to roots in water."
+      },
+      {
+        text: "When was the first commercial hydroponics farm in the Philippines established?",
+        level: "Easy",
+        levelIdx: 1,
+        points: 100,
+        options: [
+          "1980s",
+          "1950s",
+          "1960s",
+          "2010s"
+        ],
+        correctAnswer: 0,
+        explanation: "According to historical records in Hydroponics 101 (4)_2.pptx, the very first commercial hydroponic operations in the Philippines took root during the 1980s."
+      },
+      {
+        text: "How do plants grow in hydroponics?",
+        level: "Easy",
+        levelIdx: 1,
+        points: 100,
+        options: [
+          "By taking up Water, Oxygen, Carbon dioxide, and Nutrients (N, P, K, Ca, Mg, S, Fe, etc.)",
+          "By utilizing granular compost organic fertilizers dropped directly on mountain clay",
+          "By extending extremely deep roots into heavy sandbeds to seek moisture channels",
+          "By absorbing solid minerals through thick woody bark stems inside dry spaces"
+        ],
+        correctAnswer: 0,
+        explanation: "Plants in hydroponics thrive by directly absorbing Water, Oxygen, Carbon dioxide, and critical Macro/Micronutrients dissolved in liquid form."
+      },
+      {
+        text: "Which plants are a rich source of vitamins A, C, and folic acid?",
+        level: "Easy",
+        levelIdx: 1,
+        points: 100,
+        options: [
+          "Tomatoes",
+          "Lettuce",
+          "Basil",
+          "Coriander"
+        ],
+        correctAnswer: 0,
+        explanation: "Tomatoes are a rich source of vitamins A, C, and folic acid. They also contain powerful antioxidants that shield against heart disease risks."
+      },
+      {
+        text: "This system uses net pots and lets plants float on a foam board with their roots hanging deep into a tub of nutrient water. An electric aquarium air pump is used to blow tiny air bubbles to keep the roots breathing.",
+        level: "Easy",
+        levelIdx: 1,
+        points: 100,
+        options: [
+          "Deep Water Culture (DWC) System",
+          "Wicking System",
+          "The Kratky Method",
+          "Drip System"
+        ],
+        correctAnswer: 0,
+        explanation: "In Deep Water Culture (DWC) systems, plants hang from a floating platform above oxygenated nutrient water to keep roots breathing."
+      },
+
+      // Medium (Questions 6-10)
+      {
+        text: "In this hydroponic system, plants are placed in a net pot, hung by a floating platform and parts of roots are submerged in the water while the rest are exposed to the air.",
+        level: "Medium",
+        levelIdx: 2,
+        points: 200,
+        options: [
+          "The Kratky Method",
+          "Aeroponics",
+          "Nutrient Film Technique (NFT)",
+          "Ebb and Flow System"
+        ],
+        correctAnswer: 0,
+        explanation: "The Kratky Method is a hands-off, low-cost system where water levels reduce over time, leaving an air zone for the exposed upper root segments."
+      },
+      {
+        text: "This hydroponic system pumps nutrient solution and delivers it to plant roots via capillary movement of the wick.",
+        level: "Medium",
+        levelIdx: 2,
+        points: 200,
+        options: [
+          "Wicking System",
+          "Drip System",
+          "Aeroponics",
+          "Ebb and Flow System"
+        ],
+        correctAnswer: 0,
+        explanation: "The Wicking System delivers nutrient solution upwards using capillary force of a soft wick directly into the plant's growing medium."
+      },
+      {
+        text: "What is a low-calorie vegetable that contains phyto-nutrients which prevent diseases?",
+        level: "Medium",
+        levelIdx: 2,
+        points: 200,
+        options: [
+          "Lettuce",
+          "Tomatoes",
+          "Strawberries",
+          "Basil"
+        ],
+        correctAnswer: 0,
+        explanation: "Lettuce is extremely low in calories and contains rich phyto-nutrients possessing highly valued health-promoting and disease-preventing properties."
+      },
+      {
+        text: "What are the commonly used method techniques by urban gardeners?",
+        level: "Medium",
+        levelIdx: 2,
+        points: 200,
+        options: [
+          "The Kratky Method and Nutrient Film Technique",
+          "Drip System and Aeroponics",
+          "Ebb and Flow System and Wicking System",
+          "Deep Water Culture and Wicking System"
+        ],
+        correctAnswer: 0,
+        explanation: "According to urban gardening statistics in Hydroponics 101 (4)_2.pptx, the Kratky Method and Nutrient Film Technique (NFT) are highly favored for small spaces."
+      },
+      {
+        text: "What hydroponic system uses small tubes that sit right next to the stem of each plant where a timer slowly drips nutrient water onto the base of each plant, moistening the roots?",
+        level: "Medium",
+        levelIdx: 2,
+        points: 200,
+        options: [
+          "Drip System",
+          "Aeroponics",
+          "Ebb and Flow System",
+          "Wicking System"
+        ],
+        correctAnswer: 0,
+        explanation: "Drip systems are ideal for larger gardens, pumping liquid solutions through dynamic micro-tubes resting directly at the crop base."
+      },
+
+      // Difficult (Questions 11-15)
+      {
+        text: "What hydroponics system suspends roots in the air and misted with nutrient solution continuously?",
+        level: "Hard",
+        levelIdx: 3,
+        points: 300,
+        options: [
+          "Aeroponics",
+          "The Kratky Method",
+          "Deep Water Culture (DWC)",
+          "Ebb and Flow System"
+        ],
+        correctAnswer: 0,
+        explanation: "In futuristic Aeroponics, roots hang freely in mid-air and are periodically sprayed with hyper-fine nutritional water mist."
+      },
+      {
+        text: "What plant can we grow in hydroponics which contains vitamin C, vitamin E, and beta-carotene?",
+        level: "Hard",
+        levelIdx: 3,
+        points: 300,
+        options: [
+          "Bok Choy / Pechay",
+          "Lettuce",
+          "Tomatoes",
+          "Coriander"
+        ],
+        correctAnswer: 0,
+        explanation: "Bok Choy / Pechay features vitamins C, E, and beta-carotene antioxidants, alongside folate which helps repair cell DNA to prevent mutations."
+      },
+      {
+        text: "Plants are lined up in slightly tilted long plastic gutters. A water pump continuously runs a super thin, shallow stream (a 'film') of nutrient water over the tips of the roots.",
+        level: "Hard",
+        levelIdx: 3,
+        points: 300,
+        options: [
+          "Nutrient Film Technique (N.F.T)",
+          "The Kratky Method",
+          "Drip System",
+          "Ebb and Flow System"
+        ],
+        correctAnswer: 0,
+        explanation: "Nutrient Film Technique (NFT) cascades a thin, continuous film of water downwards over plant roots to provide moisture and oxygen."
+      },
+      {
+        text: "What hydroponic part is used to promote photosynthesis?",
+        level: "Hard",
+        levelIdx: 3,
+        points: 300,
+        options: [
+          "Grow lights / Sunlight",
+          "Water Pump",
+          "Air Pump",
+          "Reservoir Container"
+        ],
+        correctAnswer: 0,
+        explanation: "Plants require sufficient light energy to execute photosynthesis. High-efficiency grow lights or morning sunlight (6 hours daily) are ideal."
+      },
+      {
+        text: "What is a growing medium used to support plant's weight if we are using net pots, deliver moisture and oxygen to the root system and expose to nutrients?",
+        level: "Hard",
+        levelIdx: 3,
+        points: 300,
+        options: [
+          "coco fiber/chips, rockwool and oasis cube",
+          "garden soil, backyard silt, and clean river sand",
+          "fine gravel pebbles, dried volcanic ash, and clay mix",
+          "crumpled organic peat moss, sawdust, and compost manure"
+        ],
+        correctAnswer: 0,
+        explanation: "The presentation Hydroponics 101 (4)_2.pptx validates coco fiber/chips, rockwool, and oasis cubes as standard, neutral growing media that hold moisture and oxygen perfectly."
+      }
+    ];
+
+    let activeQuestions = [];
+    let currentQuestionIndex = 0;
+    let score = 0;
+    let correctAnswersCount = 0;
+    let wrongAnswersCount = 0;
+    let selectedCropType = 'tomato';
+    let consecutiveCorrect = 0;
+
+    // Web Audio API Synthesizer variables
+    let audioCtx = null;
+    let bgmIntervalId = null;
+    let isMuted = false;
+    let currentChordIndex = 0;
+
+    // Bright, cheerful, and lively progression (C Major -> G Major -> A Minor -> F Major)
+    const bgmChords = [
+      [130.81, 164.81, 196.00], // C3 Major (C, E, G)
+      [196.00, 246.94, 293.66], // G3 Major (G, B, D)
+      [220.00, 261.63, 329.63], // A3 Minor (A, C, E)
+      [174.61, 220.00, 261.63]  // F3 Major (F, A, C)
+    ];
+
+    function prepareSessionQuestions() {
+      // Loop and shuffle both choices and assign dynamically mapped indexes
+      activeQuestions = sourceQuestions.map(q => {
+        const correctAnswerText = q.options[q.correctAnswer];
+        // Shuffle options array using Fisher-Yates
+        const shuffledOptions = [...q.options];
+        for (let i = shuffledOptions.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]];
+        }
+        // Relocate correct answer index
+        const newCorrectIndex = shuffledOptions.indexOf(correctAnswerText);
+        return {
+          ...q,
+          options: shuffledOptions,
+          correctAnswer: newCorrectIndex
+        };
+      });
+    }
+
+    function initAudio() {
+      if (audioCtx) return;
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      startBGM();
+    }
+
+    function startBGM() {
+      if (bgmIntervalId) clearInterval(bgmIntervalId);
+      let step = 0;
+      
+      // Dynamic, fast, and bouncy tempo (250ms interval = ~240 BPM eighth notes)
+      bgmIntervalId = setInterval(() => {
+        if (isMuted || !audioCtx) return;
+        if (audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        
+        const chord = bgmChords[currentChordIndex];
+        const beat = step % 8;
+        
+        let freq;
+        let vol = 0.04;
+        let decay = 0.15;
+        
+        // Lively tropical rhythmic pattern:
+        // Beats 0 and 4 play a warm, bouncy bass note.
+        // Other beats play upbeat, bright plucky marimba-like melodies!
+        if (beat === 0 || beat === 4) {
+          freq = chord[0]; // Bass root note (lower octave)
+          vol = 0.07;
+          decay = 0.3;
+          playTone(freq, "triangle", vol, decay);
+        } else if (beat === 2 || beat === 6) {
+          freq = chord[1] * 2.5; // High bright upbeat note (arpeggiated)
+          playTone(freq, "sine", vol, decay);
+        } else if (beat === 1 || beat === 5 || beat === 3 || beat === 7) {
+          freq = chord[2] * 2; // Mid bouncy pluck note
+          playTone(freq, "sine", vol * 0.7, decay * 0.8);
+        }
+        
+        step++;
+        if (step % 8 === 0) {
+          currentChordIndex = (currentChordIndex + 1) % bgmChords.length;
+        }
+      }, 250); 
+    }
+
+    function playTone(freq, type, volume, duration) {
+      if (isMuted || !audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+
+    function playSFX(type) {
+      initAudio();
+      if (isMuted || !audioCtx) return;
+      if (type === 'correct') {
+        playTone(523.25, "sine", 0.15, 0.4); // C5
+        setTimeout(() => playTone(659.25, "sine", 0.15, 0.4), 100); // E5
+        setTimeout(() => playTone(783.99, "sine", 0.2, 0.6), 200); // G5
+      } else if (type === 'incorrect') {
+        playTone(220.0, "sawtooth", 0.15, 0.6); // Low buzz
+        setTimeout(() => playTone(170.0, "sawtooth", 0.15, 0.6), 150);
+      } else if (type === 'level-up') {
+        playTone(440.0, "triangle", 0.1, 0.3);
+        setTimeout(() => playTone(554.37, "triangle", 0.15, 0.3), 100);
+        setTimeout(() => playTone(659.25, "triangle", 0.2, 0.7), 200);
+      } else if (type === 'win') {
+        const notes = [523.25, 587.33, 659.25, 698.46, 783.99, 880.00, 987.77, 1046.50];
+        notes.forEach((freq, idx) => {
+          setTimeout(() => playTone(freq, "sine", 0.15, 0.5), idx * 100);
+        });
+      } else if (type === 'click') {
+        playTone(440, "sine", 0.05, 0.1);
+      }
+    }
+
+    // Toggle Music Handler
+    document.getElementById('music-toggle').addEventListener('click', () => {
+      isMuted = !isMuted;
+      initAudio();
+      const onIcon = document.getElementById('music-on-icon');
+      const offIcon = document.getElementById('music-off-icon');
+      if (isMuted) {
+        onIcon.classList.add('hidden');
+        offIcon.classList.remove('hidden');
+      } else {
+        onIcon.classList.remove('hidden');
+        offIcon.classList.add('hidden');
+      }
+      playSFX('click');
+    });
+
+    function selectCrop(crop) {
+      selectedCropType = crop;
+      playSFX('click');
+      const buttons = document.querySelectorAll('.avatar-select-btn');
+      buttons.forEach(btn => {
+        btn.classList.remove('border-emerald-500', 'bg-emerald-50');
+        btn.classList.add('border-gray-200', 'bg-white');
+        btn.querySelector('span:last-child').classList.remove('text-emerald-800');
+        btn.querySelector('span:last-child').classList.add('text-gray-700');
+      });
+      const clickedBtn = event.currentTarget;
+      clickedBtn.classList.remove('border-gray-200', 'bg-white');
+      clickedBtn.classList.add('border-emerald-500', 'bg-emerald-50');
+      clickedBtn.querySelector('span:last-child').classList.add('text-emerald-800');
+      clickedBtn.querySelector('span:last-child').classList.remove('text-gray-700');
+    }
+
+    function startGame() {
+      initAudio();
+      playSFX('click');
+      document.getElementById('welcome-screen').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+      
+      currentQuestionIndex = 0;
+      score = 0;
+      correctAnswersCount = 0;
+      wrongAnswersCount = 0;
+      consecutiveCorrect = 0;
+      
+      // Shuffle options and prepare current session copies
+      prepareSessionQuestions();
+      buildProgressDots();
+      resetPlantVisuals();
+      updateHUDStats();
+      loadQuestion();
+    }
+
+    function showWelcomeScreen() {
+      playSFX('click');
+      document.getElementById('welcome-screen').classList.remove('hidden');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.add('hidden');
+    }
+
+    function buildProgressDots() {
+      const parent = document.getElementById('progress-dots-container');
+      parent.innerHTML = '';
+      for (let i = 0; i < activeQuestions.length; i++) {
+        const dot = document.createElement('div');
+        dot.id = `dot-${i}`;
+        dot.className = "w-2.5 h-2.5 rounded-full bg-emerald-900/35 border border-emerald-500/10 transition-all duration-300";
+        parent.appendChild(dot);
+      }
+    }
+
+    function loadQuestion() {
+      const q = activeQuestions[currentQuestionIndex];
+      const levelDisplay = document.getElementById('level-display');
+      const levelBadge = document.getElementById('q-level-badge');
+      const scoreDisplay = document.getElementById('score-display');
+      const qNumberDisplay = document.getElementById('q-number-display');
+      const pointsIndicator = document.getElementById('q-points-indicator');
+      const qText = document.getElementById('question-text');
+      const optionsContainer = document.getElementById('options-container');
+
+      levelDisplay.textContent = q.level.toUpperCase();
+      levelBadge.textContent = `Level ${q.levelIdx}: ${q.level}`;
+      pointsIndicator.textContent = `+${q.points} PTS`;
+      qNumberDisplay.textContent = `Question ${currentQuestionIndex + 1} of ${activeQuestions.length}`;
+      qText.textContent = q.text;
+
+      if (q.level === "Easy") {
+        levelBadge.className = "px-2.5 py-1 text-[10px] font-bold rounded-md bg-green-100 text-green-800 uppercase";
+        levelDisplay.className = "text-green-300 tracking-wider";
+      } else if (q.level === "Medium") {
+        levelBadge.className = "px-2.5 py-1 text-[10px] font-bold rounded-md bg-amber-100 text-amber-800 uppercase";
+        levelDisplay.className = "text-amber-300 tracking-wider";
+      } else {
+        levelBadge.className = "px-2.5 py-1 text-[10px] font-bold rounded-md bg-red-100 text-red-800 uppercase";
+        levelDisplay.className = "text-red-300 tracking-wider";
+      }
+
+      optionsContainer.innerHTML = '';
+      const letters = ['A', 'B', 'C', 'D'];
+      
+      q.options.forEach((optText, index) => {
+        const btn = document.createElement('button');
+        btn.className = "w-full text-left bg-emerald-50/10 hover:bg-emerald-50 hover:border-emerald-400 border-2 border-slate-200 p-3 rounded-xl text-xs font-semibold text-slate-700 transition-all flex items-center gap-3 shadow-sm pulse-btn";
+        btn.innerHTML = `
+          <span class="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-[10px] shadow-sm">${letters[index]}</span>
+          <span class="flex-1">${optText}</span>
+        `;
+        btn.onclick = () => handleAnswerSelect(index);
+        optionsContainer.appendChild(btn);
+      });
+
+      updateHUDStats();
+    }
+
+    function handleAnswerSelect(selectedIndex) {
+      const q = activeQuestions[currentQuestionIndex];
+      const isCorrect = (selectedIndex === q.correctAnswer);
+      
+      const activeDot = document.getElementById(`dot-${currentQuestionIndex}`);
+      if (activeDot) {
+        activeDot.classList.remove('bg-emerald-900/35');
+        activeDot.classList.add(isCorrect ? 'bg-yellow-400' : 'bg-red-500');
+      }
+
+      const modal = document.getElementById('feedback-modal');
+      const iconBox = document.getElementById('feedback-icon-container');
+      const title = document.getElementById('feedback-title');
+      const exp = document.getElementById('feedback-explanation');
+      const ptsEarned = document.getElementById('feedback-points');
+      const actTaken = document.getElementById('feedback-action');
+
+      if (isCorrect) {
+        playSFX('correct');
+        score += q.points;
+        correctAnswersCount++;
+        consecutiveCorrect++;
+        growPlantVisuals();
+
+        iconBox.innerHTML = '✅';
+        iconBox.className = "w-14 h-14 rounded-full flex items-center justify-center text-white text-3xl shadow-md bg-gradient-to-tr from-emerald-500 to-teal-400";
+        title.innerHTML = "Fantastic Growth!";
+        title.className = "title-font text-xl md:text-2xl font-bold text-emerald-700";
+        ptsEarned.textContent = `+${q.points} PTS Earned`;
+        ptsEarned.className = "bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-lg";
+        
+        if (currentQuestionIndex < 5) {
+          actTaken.textContent = "💧 Root system extending!";
+        } else if (currentQuestionIndex < 10) {
+          actTaken.textContent = "🌿 Foliage stems expanding!";
+        } else {
+          actTaken.textContent = "🍅 Blossoms & fruit shielded!";
+        }
+      } else {
+        playSFX('incorrect');
+        wrongAnswersCount++;
+        consecutiveCorrect = 0;
+        infestPests();
+
+        iconBox.innerHTML = '⚠️';
+        iconBox.className = "w-14 h-14 rounded-full flex items-center justify-center text-white text-3xl shadow-md bg-gradient-to-tr from-rose-500 to-amber-500";
+        title.innerHTML = "Nutrient Deficient!";
+        title.className = "title-font text-xl md:text-2xl font-bold text-rose-700";
+        ptsEarned.textContent = "+0 Points Added";
+        ptsEarned.className = "bg-rose-100 text-rose-800 px-3 py-1.5 rounded-lg";
+        actTaken.textContent = "🐜 Pests spotted on crop!";
+        actTaken.className = "bg-amber-100 text-amber-800 px-3 py-1.5 rounded-lg";
+      }
+
+      exp.textContent = q.explanation;
+      document.getElementById('score-display').textContent = score;
+
+      modal.classList.remove('hidden');
+      modal.querySelector('div').classList.add('scale-100');
+    }
+
+    function nextQuestion() {
+      const modal = document.getElementById('feedback-modal');
+      modal.classList.add('hidden');
+      modal.querySelector('div').classList.remove('scale-100');
+
+      currentQuestionIndex++;
+      if (currentQuestionIndex < activeQuestions.length) {
+        if (currentQuestionIndex === 5 || currentQuestionIndex === 10) {
+          playSFX('level-up');
+        }
+        loadQuestion();
+      } else {
+        endGame();
+      }
+    }
+
+    function resetPlantVisuals() {
+      document.getElementById('root-tier-1').classList.add('hidden', 'opacity-0');
+      document.getElementById('root-tier-2').classList.add('hidden', 'opacity-0');
+      document.getElementById('root-tier-3').classList.add('hidden', 'opacity-0');
+      document.getElementById('plant-stem').classList.add('hidden');
+      document.getElementById('leaf-1').classList.add('hidden');
+      document.getElementById('leaf-2').classList.add('hidden');
+      document.getElementById('leaf-3').classList.add('hidden');
+      document.getElementById('leaf-4').classList.add('hidden');
+      document.getElementById('flowers').classList.add('hidden');
+      document.getElementById('fruits').classList.add('hidden');
+      document.getElementById('pests-group').classList.add('hidden');
+
+      // Adjust fruit colors based on selection
+      const cropShapesGroup = document.getElementById('crop-shapes-g');
+      if (selectedCropType === 'lettuce') {
+        cropShapesGroup.innerHTML = `
+          <circle cx="80" cy="95" r="9" fill="#22c55e" stroke="#15803d" />
+          <circle cx="120" cy="80" r="10" fill="#22c55e" stroke="#15803d" />
+        `;
+      } else if (selectedCropType === 'pechay') {
+        cropShapesGroup.innerHTML = `
+          <path d="M75 90 C70 85, 90 70, 80 95 Z" fill="#86efac" stroke="#166534" />
+          <path d="M115 75 C110 70, 130 55, 120 80 Z" fill="#86efac" stroke="#166534" />
+        `;
+      } else { // Tomato
+        cropShapesGroup.innerHTML = `
+          <circle cx="80" cy="95" r="7.5" fill="#ef4444" stroke="#b91c1c" />
+          <circle cx="120" cy="80" r="8.5" fill="#ef4444" stroke="#b91c1c" />
+          <circle cx="77" cy="92" r="1.5" fill="white" opacity="0.6"/>
+          <circle cx="117" cy="77" r="1.5" fill="white" opacity="0.6"/>
+        `;
+      }
+    }
+
+    function growPlantVisuals() {
+      // Clear pests if answered correctly as requested ("pests will go away")
+      document.getElementById('pests-group').classList.add('hidden');
+
+      // Expand parts step by step
+      if (correctAnswersCount >= 1) {
+        document.getElementById('root-tier-1').classList.remove('hidden', 'opacity-0');
+      }
+      if (correctAnswersCount >= 3) {
+        document.getElementById('root-tier-2').classList.remove('hidden', 'opacity-0');
+      }
+      if (correctAnswersCount >= 5) {
+        document.getElementById('root-tier-3').classList.remove('hidden', 'opacity-0');
+        document.getElementById('plant-stem').classList.remove('hidden');
+      }
+      if (correctAnswersCount >= 7) {
+        document.getElementById('leaf-1').classList.remove('hidden');
+      }
+      if (correctAnswersCount >= 9) {
+        document.getElementById('leaf-2').classList.remove('hidden');
+        document.getElementById('leaf-3').classList.remove('hidden');
+      }
+      if (correctAnswersCount >= 11) {
+        document.getElementById('leaf-4').classList.remove('hidden');
+      }
+      if (correctAnswersCount >= 13) {
+        document.getElementById('flowers').classList.remove('hidden');
+      }
+      if (correctAnswersCount >= 14) {
+        document.getElementById('fruits').classList.remove('hidden');
+      }
+    }
+
+    function infestPests() {
+      document.getElementById('pests-group').classList.remove('hidden');
+    }
+
+    function updateHUDStats() {
+      const ecValue = document.getElementById('ec-value');
+      const phValue = document.getElementById('ph-value');
+      const statusText = document.getElementById('hud-status');
+
+      if (currentQuestionIndex < 5) {
+        ecValue.textContent = "1.2 mS/cm";
+        phValue.textContent = "6.5 pH (Optimal)";
+        statusText.textContent = "🌱 ROOT STAGE ACTIVATED";
+      } else if (currentQuestionIndex < 10) {
+        ecValue.textContent = "1.8 mS/cm";
+        phValue.textContent = "6.2 pH (Optimal)";
+        statusText.textContent = "🌿 VEGETATIVE BARK";
+      } else {
+        ecValue.textContent = "2.4 mS/cm";
+        phValue.textContent = "5.8 pH (Optimal)";
+        statusText.textContent = "🍅 FLOWERING & CROPS";
+      }
+    }
+
+    function endGame() {
+      playSFX('win');
+      document.getElementById('game-screen').classList.add('hidden');
+      document.getElementById('gameover-screen').classList.remove('hidden');
+
+      const finalScoreEl = document.getElementById('final-score');
+      const finalAccuracyEl = document.getElementById('final-accuracy');
+      const finalCorrectFractionEl = document.getElementById('final-correct-fraction');
+      const finalRankEl = document.getElementById('final-rank');
+      const finalRankDescEl = document.getElementById('final-rank-desc');
+
+      finalScoreEl.textContent = score;
+      const accuracyPct = Math.round((correctAnswersCount / activeQuestions.length) * 100);
+      finalAccuracyEl.textContent = `${accuracyPct}%`;
+      finalCorrectFractionEl.textContent = `${correctAnswersCount} / ${activeQuestions.length} Correct`;
+
+      if (accuracyPct >= 85) {
+        finalRankEl.textContent = "Master Hydro-Grower 👑";
+        finalRankDescEl.textContent = "Perfect control of pH and nutrient mix ratios!";
+        finalRankEl.className = "text-sm font-black text-emerald-600 uppercase mt-1";
+      } else if (accuracyPct >= 65) {
+        finalRankEl.textContent = "Suburban Farmer 🧑‍🌾";
+        finalRankDescEl.textContent = "Solid agricultural growth. Keep on cultivating!";
+        finalRankEl.className = "text-sm font-black text-teal-600 uppercase mt-1";
+      } else {
+        finalRankEl.textContent = "Novice Sprouter 🌱";
+        finalRankDescEl.textContent = "Double check study materials and grow again!";
+        finalRankEl.className = "text-sm font-black text-orange-600 uppercase mt-1";
+      }
+    }
+
+    function restartGame() {
+      playSFX('click');
+      startGame();
+    }
+  </script>
+</body>
+</html>
